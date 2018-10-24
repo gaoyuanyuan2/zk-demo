@@ -2,9 +2,11 @@ package com.gaoyuanyuan.yan.zk.distributed.lock.redis;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DigestUtils;
 import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 import java.util.List;
@@ -20,15 +22,14 @@ import java.util.List;
  * 但是第一条指令SETNX仍然是已经生效的！不过此种情况基本可以认为是Redis服务器已经崩溃（除非是开发阶段就可以排除的参数错误之类的问题），
  * 那么锁的安全性就已经不是这里可以关注的点了。这里认为对客户端来说是相对原子性的就足够了。
  */
+@Service
 public class RedisLock {
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
-    private final StringRedisTemplate stringRedisTemplate;
+    @Autowired
+    private  StringRedisTemplate stringRedisTemplate;
 
-    private final String lockKey;
-
-    private final List<String> keys;
 
     /**
      * 使用脚本在redis服务器执行这个逻辑可以在一定程度上保证此操作的原子性
@@ -49,14 +50,11 @@ public class RedisLock {
         SETNX_AND_EXPIRE_SCRIPT = new RedisScriptImpl<Boolean>(sb.toString(), Boolean.class);
     }
 
-    public RedisLock(StringRedisTemplate stringRedisTemplate, String lockKey) {
-        this.stringRedisTemplate = stringRedisTemplate;
-        this.lockKey = lockKey;
-        this.keys = Collections.singletonList(lockKey);
-    }
 
-    private boolean doTryLock(int lockSeconds) throws Exception {
-        return stringRedisTemplate.execute(SETNX_AND_EXPIRE_SCRIPT, keys, "1", String.valueOf(lockSeconds));
+
+    private boolean doTryLock(int lockSeconds,String lockKey) throws Exception {
+        List<String> keys = Collections.singletonList(lockKey);
+        return stringRedisTemplate.execute(SETNX_AND_EXPIRE_SCRIPT, keys,"1", String.valueOf(lockSeconds));
     }
 
     /**
@@ -64,9 +62,9 @@ public class RedisLock {
      *
      * @param lockSeconds 加锁的时间(秒)，超过这个时间后锁会自动释放
      */
-    public boolean tryLock(int lockSeconds) {
+    public boolean tryLock(int lockSeconds,String lockKey) {
         try {
-            return doTryLock(lockSeconds);
+            return doTryLock(lockSeconds,lockKey);
         } catch (Exception e) {
             logger.error("tryLock Error", e);
             return false;
@@ -80,7 +78,7 @@ public class RedisLock {
      * @param tryIntervalMillis 轮询的时间间隔(毫秒)
      * @param maxTryCount       最大的轮询次数
      */
-    public boolean tryLock(final int lockSeconds, final long tryIntervalMillis, final int maxTryCount) {
+    public boolean tryLock(final int lockSeconds, final long tryIntervalMillis, final int maxTryCount,String lockKey) {
         int tryCount = 0;
         while (true) {
             if (++tryCount >= maxTryCount) {
@@ -89,7 +87,7 @@ public class RedisLock {
             }
 
             try {
-                if (doTryLock(lockSeconds)) {
+                if (doTryLock(lockSeconds,lockKey)) {
                     return true;
                 }
             } catch (Exception e) {
@@ -110,7 +108,7 @@ public class RedisLock {
      * 如果加锁后的操作比较耗时，调用方其实可以在unlock前根据时间判断下锁是否已经过期
      * 如果已经过期可以不用调用，减少一次请求
      */
-    public void unlock() {
+    public void unlock(String lockKey) {
         stringRedisTemplate.delete(lockKey);
     }
 

@@ -22,6 +22,7 @@ import java.util.UUID;
  * 此对象非线程安全，使用时务必注意
  */
 public class RedisLock2 {
+
     private static final Logger logger = LoggerFactory.getLogger(RedisLock.class);
 
     private final StringRedisTemplate stringRedisTemplate;

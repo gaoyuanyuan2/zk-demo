@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -21,6 +22,7 @@ import java.util.Arrays;
  *  那么假设在SETNX命令执行完成之后，在EXPIRE命令发出去之前客户端发生崩溃（或客户端与Redis服务器的网络连接突然断掉），
  *  导致EXPIRE命令没有得到执行，其他客户端将会发生永久死锁！
  */
+@Service
 public class DistributedLock {
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
